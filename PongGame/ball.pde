@@ -8,19 +8,15 @@ class Ball {
 
   float multiplier;
 
-  boolean inBounds;
-
   Ball() {
     x = width/2;
     y = random(height/4, height/4*3);
     diameter = 8;
 
-    multiplier = 1.5;
+    multiplier = 2.5;   // this is really the speed
 
-    xSpeed = -1.0;
-    ySpeed = 1;
-
-    inBounds = true;
+    xSpeed = -1.0;      // x direction
+    ySpeed = 1;         // y direction
   }
 
   void display() {
@@ -29,96 +25,79 @@ class Ball {
     rect(this.x, this.y, this.diameter, this.diameter);
   }
 
-  void develop() {
-    fill(255);
-    noStroke();
-    textSize(14);
-    textAlign(CENTER);
-    String displaySpeed = String.format("%.2f", multiplier);
-
-    text("Ball Speed: " + displaySpeed, width/2, 25);
-  }
-
   void move() {
 
-    // detect if ball is in same xPos as paddle
-    if (x-diameter/2 == playerA.x+playerA.w/2) {
-      // if the paddle is at the same vertical location as ball
-      if (y >= playerA.y-playerA.h/2 && y <= playerA.y+playerA.h/2) {
-        inBounds = true;
-        xSpeed = -xSpeed;
-      } else {      
-        if (restartGame) {
-          inBounds = false;
-        }
-      }
-    } else if (x-diameter/2 < playerA.x+playerA.w/2) {
-      // ball past paddle
-      if (endlessGame) {
-        if (x <= 4) {
-          println("player A missed");
-          x = 5;
-          xSpeed = 1;
-          playerB.points++;
-        }
-      }
+    // change x direction
+    if (((x-diameter/2) <= 0) || ((x+diameter/2) >= width)) {
+      xSpeed = -xSpeed;
     }
 
-    if (x+diameter/2 == playerB.x-playerB.w/2) {
-      //if paddle at same vertical location as ball
-      if (y >= playerB.y-playerB.h/2 && y <= playerB.y+playerB.h/2) {
-        inBounds = true;
-        xSpeed = -xSpeed;
-      } else {      
-        if (restartGame) {
-          inBounds = false;
-        }
-      }
-    } else if (x+diameter/2 > playerB.x-playerB.w/2) {
-      // ball past paddle
-      if (endlessGame) {
-        if (x >= width-4) {
-          println("player B missed");
-          x = width-5;
-          xSpeed = -1;
-          playerA.points++;
-        }
-      }
-    }
-
+    // change y direction
     if (y >= height-diameter/2 || y <= diameter/2) {
       ySpeed = -ySpeed;
     }
 
-    if (inBounds) {
-      x = x + (xSpeed*multiplier);
-      y = y + (ySpeed*multiplier);
-    } else {
-      // player missed ball
-
-      if (restartGame) {
-        background(255, 0, 0);
-        deadScreen = true;
-        gameScreen = false;
-        x = -15;
-        y = -15;
-        xSpeed = 0;
-        ySpeed = 0;
+    // detect if ball was hit by paddles
+    float paddleAEdge = players[0].x+players[0].w/2;
+    if ((x >= (paddleAEdge - multiplier/2)) && (x <= (paddleAEdge + multiplier/2))) {
+      // if the paddle is at the same vertical location as ball
+      if (y >= players[0].y-players[0].h/2 && y <= players[0].y+players[0].h/2) {
+        // change direction
+        xSpeed = -xSpeed;
+        // set paddle past outer boundary
+        x = paddleAEdge+multiplier/2 + multiplier;
+      } else {
+        if (xSpeed == -1) {
+          println("player A missed");
+          players[1].points++;
+        }
       }
     }
+
+  float paddleBEdge = players[1].x-players[1].w/2;
+    if ((x >= (paddleBEdge - multiplier/2)) && (x <= (paddleBEdge + multiplier/2))) {
+      // if the paddle is at the same vertical location as ball
+      if (y >= players[1].y-players[1].h/2 && y <= players[1].y+players[1].h/2) {
+        // change direction
+        xSpeed = -xSpeed;
+        // set paddle past outer boundary
+        x = paddleBEdge-multiplier/2 - multiplier;
+      } else {
+        if (xSpeed == 1) {
+          println("player B missed");
+          players[0].points++;
+        }
+      }
+    }
+
+
+
+
+
+
+    // keep ball moving
+    x = x + (xSpeed*multiplier);
+    y = y + (ySpeed*multiplier);
   }
 
   void reset() {
     x = width/2;
     y = random(height/4, height/4*3);
 
-    //float direction[] = {-0.5,0.5};
-    //int tempSpeed = direction[float(random(0,1.5))];
-    //println(tempSpeed);
-
     xSpeed = -1.0;
     ySpeed = 1;
+  }
+  
+  void develop() {
+    fill(255);
+    noStroke();
+    textSize(14);
+    textAlign(CENTER);
+    String displaySpeed = String.format("%.2f", multiplier);
+    String posX = String.format("%.2f", x);
+    String posY = String.format("%.2f", y);
 
-    inBounds = true;
+    text("Ball Speed: " + displaySpeed, width/2, 25);
+    text("Ball Position: " + posX + ", " + posY, width/2, 40);
   }
 }

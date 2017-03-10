@@ -1,345 +1,233 @@
-
-import processing.serial.*;
-
-int counter = 0;
-
-boolean introScreen = true;
-boolean controllerScreen = false;
-boolean gameScreen = false;
-boolean deadScreen = false;
-
-boolean developMode = false;
-
-boolean endlessGame = true;
-boolean restartGame = false;
+import processing.net.*;
 
 
-int deadcounter = 0;
+// variables for clients and server
+Server serv;                   // server object
+String serverIP;
+int port = 12345;
+StringList activeClients;      // keep track of clients
 
-
-
-
-PFont myFont;
-Ball ball;
-
-Paddle playerA;
-Paddle playerB;
-
+// Array to track players
 Paddle[] players = new Paddle[2];
+// NOTE: use index value in array to determine Player A or B
 
-Serial[] myPorts = new Serial[3];  // Create a list of objects from Serial class
-// last port is master
-
-
-
-void openPort(int indexPort) {
-  int portNum = 1+indexPort;
-  String portName = Serial.list()[portNum];
-  myPorts[indexPort] = new Serial(this, portName, 9600);
-
-  myPorts[indexPort].clear();
-  myPorts[indexPort].bufferUntil('\n');
-
-  println("Port " + indexPort + " is open!");
-}
-
+// Graphic Display Elements
+Ball ball;
+int offsetDist = 40;
+boolean developMode = true;
 
 void setup() { 
-  size(700, 700);
+  size(1200, 700);
   rectMode(CENTER);
+  textAlign(CENTER);
 
-  players[0] = new Paddle();
-  players[1] = new Paddle();
+  background(0);
 
-  playerA = players[0];
-  playerB = players[1];
+  // create a new server
+  serv = new Server(this, port);
+  if (serv.active()) {
+    serverIP = Server.ip();
+    println("server is active");
+    println("server ip: " + serverIP);
+    // 172.16.245.191 (NYU)
+    // 169.254.130.186 (macbook as network????)
+    // 172, 20, 10, 3 (iPhone hotspot)
+  }
 
+  // setup clients
+  activeClients = new StringList();
+
+  // setup ball
   ball = new Ball();
 
-  myFont = createFont("ApercuPro-Mono", 18);
-  textFont(myFont);
+  // setup players
+  for (int i = 0; i < players.length; i++) {
+    players[i] = new Paddle();
+    players[i].index = i;
+    if (i == 0) {
+      players[i].x = offsetDist;
+      // left side
+    } else {
+      players[i].x = width-offsetDist;
+    }
+  }
 } 
 
-void draw() { 
-  if (introScreen) {
-    //background(50, 180, 170);
-    background(0);
-    textAlign(CENTER);
-    fill(255);
-    noStroke();
-    textSize(18);
-    text("24 Controllers for Pong", width/2, height/2);
-    // rules
 
-    textSize(18);
-    if (counter >= 30) {
-      fill(255);
-      noStroke();
-      text("18", (width/2-125), (height/2-20));
-      stroke(255);
-      strokeWeight(2);
-      line((width/2-130), (height/2-15), (width/2-110), (height/2+3));
-    } 
-    
-    if (counter >= 70) {
-      fill(255);
-      noStroke();
-      text("12", (width/2-135), (height/2-40));
-      stroke(255);
-      strokeWeight(2);
-      line((width/2-112), (height/2-20), (width/2-135), (height/2-32));
-    }
-    
-    if (counter >= 130) {
-      fill(255);
-      noStroke();
-      text("7", (width/2-140), (height/2-62));
-      stroke(255);
-      strokeWeight(2);
-      line((width/2-120), (height/2-38), (width/2-145), (height/2-52));
-      ellipseMode(CENTER);
-      noFill();
-      stroke(255);
-      strokeWeight(3);
-      ellipse(width/2-141,height/2-70,25,25);
-    }
+void draw() {
+  listenToClients();
 
-    if (counter >= 220) {
-      textSize(13);
-      fill(255);
-      noStroke();
-      text("1. Hit the ball back and forth by controlling your on-screen paddle.", width/2, height/2+50);
-      text("2. Each player may use any paddle for the duration of a game.", width/2, height/2+70);
-      text("3. Score a point when the other player fails to return the ball.", width/2, height/2+90);
-      text("4. Use the shared knob to adjust the ball's speed.", width/2, height/2+110);
-    }
+  background(20, 50, 200);
 
-    if (counter >= 600) {
-      introScreen = false;
-      controllerScreen = true;
-    }
-    counter++;
-  } // end introscreen
 
-  if (controllerScreen) {
-    //background(190, 210, 40);
-    background(0);
-    textSize(18);
-    textAlign(CENTER);
-    fill(255);
-    text("Plug in your controller\nand test it out!", width/2, height/2-50);
-    text("When both players feel comfortable,\npress the red button to start", width/2, height/2+50); 
-
-    if (myPorts[0] == null) {
-      openPort(0);
-    } else {
-    }
-
-    if (myPorts[1] == null) {
-      openPort(1);
-    }
-    
-    if (myPorts[2] == null) {
-      openPort(2);
-    }
-
-    for (int i = 0; i < players.length; i++) {
-      if (players[i].known) {
-        // show the paddle
-        players[i].display();
-        if (players[i].constMove) {
-          players[i].move();
-        }
+  for (int i = 0; i < players.length; i++) {
+    if (players[i].clientID != null) {
+      // show the paddle
+      players[i].display();
+      // move the paddle (if applicable)
+      players[i].move();
+      if (developMode) {
+        players[i].develop();
       }
+    } else {
+      fill(255);
+      noStroke();
+      textAlign(CENTER);
+      textSize(30);
+      text("turn on a controller", width/2, height/2);
     }
   }
 
-  if (gameScreen) {
-    
-    if (endlessGame) {
-      background(20, 40, 200);
-    }
-    
-    if (restartGame) {
-      background(125, 20, 125);
-    }
-    
-
+  if (activeClients.size() == players.length) {
+    // let's play!
     ball.display();
     ball.move();
-    
-    if (endlessGame) {
-      // display points
-      fill(255);
-      noStroke();
-      textSize(30);
-      textAlign(RIGHT);
-      text(playerA.points, width/2-50, height-20);
-      textAlign(LEFT);
-      text(playerB.points, width/2+50, height-20);
-    }
+    displayPoints();
+  }
+}
+void displayPoints() {
+  // display points 
+  fill(255);
+  noStroke();
+  textSize(24);
+  textAlign(RIGHT);
+  text(players[0].points, width/4, height-20);
+  textAlign(LEFT);
+  text(players[1].points, width-width/4, height-20);
+}
 
+
+// ServerEvent message is generated when a NEW client connects 
+// to an existing server.
+void serverEvent(Server theServer, Client theClient) {
+}
+
+void listenToClients() {
+  // get message from client
+  Client thisClient = serv.available();
+
+  // check that client isnt null
+  if (thisClient != null) {
+    String message = thisClient.readString();
+    // check that it said something
+    if (message != null) {
+      if (message.equals("remove")) {
+        removeClient(thisClient);
+      } else if (message.indexOf("hello") != -1) {
+        checkClient(thisClient, message);
+      } else {
+        adjustPlayer(thisClient, message);
+      }
+    }
+  }
+}
+
+void checkClient(Client thisClient, String message) {
+  String clientID = thisClient.ip();
+
+  Paddle thisPlayer = new Paddle();
+
+  // check if this is an existing client or new
+  if (activeClients.hasValue(clientID) == true) {
+    // use message as behaviour
+    println("uh oh! client exists?");
+  } else {
+    // check if any paddle has an empty client
     for (int i = 0; i < players.length; i++) {
-      if (players[i].known) {
-        // show the paddle
-        players[i].display();
-        if (players[i].constMove) {
-          players[i].move();
-        }
+      if (players[i].clientID == null) {
+        // emptry player found!
+        thisPlayer = players[i];
+
+        // add client to list
+        activeClients.append(clientID);
+        break;
       }
     }
-  }
-  
-  if (developMode) {
-    ball.develop();
-    playerA.develop();
-    playerB.develop();
-    
-    if (endlessGame) {
-      textSize(14);
-      textAlign(CENTER);
-      text("Endless Mode", width/2, 50);
+    // assign properties of controller to player
+    // assign client to first empty player
+    thisPlayer.clientID = clientID;
+    println("added " + clientID + ", " + thisPlayer.ctrl);
+    // name - substring will always start at index 5
+    thisPlayer.ctrl = message.substring(5);
+
+    switch (thisPlayer.ctrl) {
+    case "controllerA":
+      thisPlayer.constMove = false;
+      thisPlayer.increment = 30;
+      break;
+
+    case "controllerB":
+      thisPlayer.constMove = true;
+      thisPlayer.increment = 3;
+      break;
     }
-    
-    if (restartGame) {
-      textSize(14);
-      textAlign(CENTER);
-      text("Restart Mode", width/2, 50);
-    }
-  }
-  
-
-  if (deadScreen) {
-    
-    if (restartGame) {
-      //background(20, 40, 200);
-      background(255,0,0);
-      
-      textAlign(CENTER);
-      textSize(42);
-
-      if (deadcounter > 0 && deadcounter <= 30) {
-        text("5", width/2, height/2);
-      }
-      
-      if (deadcounter >= 31 && deadcounter <= 60) {
-        text("4", width/2, height/2);
-      }
-  
-      if (deadcounter >= 61 && deadcounter <= 90) {
-        text("3", width/2, height/2);
-      }
-      
-      if (deadcounter >= 91 && deadcounter <= 120) {
-        text("2", width/2, height/2);
-      }
-      
-      if (deadcounter >= 121 && deadcounter <= 150) {
-        text("1", width/2, height/2);
-      }
-      
-      if (deadcounter >= 151) {
-        deadScreen = false;
-        gameScreen = true;
-        ball.reset();
-        deadcounter = 0;
-      }
-      
-      deadcounter++;
-    }
-  }
-  
-  //saveFrame("Capture-######.png");
-}
-
-
-void serialEvent(Serial thisPort) {
-
-  // variable to hold the number of the port:
-  int portNumber = -1;
-  // iterate over the list of ports opened, and match the 
-  // one that generated this event:
-  for (int p = 0; p < myPorts.length; p++) {
-    if (thisPort == myPorts[p]) {
-      portNumber = p;
-    }
-  }
-
-
-  // Read the serial buffer
-  String inputString = thisPort.readString();
-
-  if (inputString != null) {
-    inputString = trim(inputString);
-    String[] arrayInput = split(inputString, ",");
-    
-    // players control
-    if (portNumber == 0 || portNumber == 1) {
-      playerFunction(portNumber, arrayInput);
-    }
-
-    // global control
-    if (portNumber == 2) {
-      sharedController(portNumber, arrayInput);
-    }
-    
   }
 }
 
 
-void keyPressed() {
-  
-  // GAME MODE 
-  if (key == 'g' || key == 'G') {
-    endlessGame = !endlessGame;
-    restartGame = !restartGame;
+
+
+void adjustPlayer(Client thisClient, String message) {
+
+  // which player?
+  Paddle thisPlayer = new Paddle();
+  String clientID = thisClient.ip();
+
+  if (activeClients.size() == players.length) {
+
+    // determine with player client is associated with
+    for (int i = 0; i < players.length; i++) {
+      if (players[i].clientID.equals(clientID)) {
+        // player identified!
+        thisPlayer = players[i];
+        println("adjust player " + i);
+      }
+    }
+
+    switch (message) {
+    case "u":
+      if (thisPlayer.constMove == false) {
+        thisPlayer.y = thisPlayer.y - thisPlayer.increment;
+      } else {
+        thisPlayer.upSpeed = 1;
+        thisPlayer.dnSpeed = 0;
+      }
+      break;
+
+    case "d":
+      thisPlayer.y = thisPlayer.y + thisPlayer.increment;
+      if (thisPlayer.constMove == false) {
+        thisPlayer.y = thisPlayer.y + thisPlayer.increment;
+      } else {
+        thisPlayer.upSpeed = 0;
+        thisPlayer.dnSpeed = 1;
+      }
+      break;
+    }
   }
-  
-  // DEVELOPMENT MODE
-  if (key == 'd' || key == 'D') {
-    developMode = !developMode;
-  }
-  
-  // INCREMENT ADJUST FOR PLAYER A
-  if (key == 'z' || key == 'Z') {
-    playerA.adjIncrement++;
-  }
-  
-  if (key == 'x' || key == 'X') {
-    playerA.adjIncrement--;
-  }
-  
-  // INCREMENT ADJUST FOR PLAYER B
-  if (key == 'n' || key == 'N') {
-    playerB.adjIncrement++;
-  }
-  
-  if (key == 'm' || key == 'M') {
-    playerB.adjIncrement--;
-  }
-  
-  // controller screen
-  if (key == 'q' || key == 'Q') {
-    introScreen = false;
-    controllerScreen = true;
-    gameScreen = false;
-    deadScreen = false;
-  }
-  
-  // dead screen
-  if (key == 'a' || key == 'A') {
-    introScreen = false;
-    controllerScreen = false;
-    gameScreen = false;
-    deadScreen = true;
+}
+
+void removeClient(Client thisClient) {
+  String clientID = thisClient.ip();
+
+  // determine with player client is associated with
+  for (int j = 0; j < players.length; j++) {
+    if (players[j].clientID != null) {
+      if (players[j].clientID.equals(clientID)) {
+        // remove client from player
+        players[j].clientID = null;
+        println("removed " + clientID + " from player " + j);
+      }
+    }
   }
 
-  // game screen
-  if (key == 'p' || key == 'P') {
-    introScreen = false;
-    controllerScreen = false;
-    deadScreen = false;
-    gameScreen = true;
-    ball.reset();
+  for (int i = 0; i < activeClients.size(); i++) {
+    if (activeClients.get(i).equals(clientID)) {
+      // remove client from list
+      activeClients.remove(i);
+    }
   }
+
+  // close connection with client
+  serv.disconnect(thisClient);
 }
