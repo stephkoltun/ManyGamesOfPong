@@ -13,7 +13,7 @@ class Ball {
     y = random(height/4, height/4*3);
     diameter = 8;
 
-    multiplier = 2.5;   // this is really the speed
+    multiplier = 3;   // this is really the speed
 
     xSpeed = -1.0;      // x direction
     ySpeed = 1;         // y direction
@@ -54,13 +54,13 @@ class Ball {
       }
     }
 
-  float paddleBEdge = players[1].x-players[1].w/2;
+    float paddleBEdge = players[1].x-players[1].w/2;
     if ((x >= (paddleBEdge - multiplier/2)) && (x <= (paddleBEdge + multiplier/2))) {
       // if the paddle is at the same vertical location as ball
-      if (y >= players[1].y-players[1].h/2 && y <= players[1].y+players[1].h/2) {
-        // change direction
+      if ((y >= players[1].y-players[1].h/2) && (y <= players[1].y+players[1].h/2)) {
+    //    // change direction
         xSpeed = -xSpeed;
-        // set paddle past outer boundary
+    //    // set paddle past outer boundary
         x = paddleBEdge-multiplier/2 - multiplier;
       } else {
         if (xSpeed == 1) {
@@ -69,11 +69,6 @@ class Ball {
         }
       }
     }
-
-
-
-
-
 
     // keep ball moving
     x = x + (xSpeed*multiplier);
@@ -87,7 +82,7 @@ class Ball {
     xSpeed = -1.0;
     ySpeed = 1;
   }
-  
+
   void develop() {
     fill(255);
     noStroke();

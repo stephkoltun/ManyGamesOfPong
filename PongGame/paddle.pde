@@ -67,6 +67,7 @@ class Paddle {
       text("Player A", 40, 25);
       int displaySpeed = adjIncrement + increment;
       text("speed: " + displaySpeed, 40, 40);
+      text(ctrl, 40, 55);  // what controller it is
     }
     
     if (index==1) {
@@ -74,6 +75,7 @@ class Paddle {
       text("Player B", width-40, 25);
       int displaySpeed = adjIncrement + increment;
       text("speed: " + displaySpeed, width-40, 40);
+      text(ctrl, width-40, 55);  // what controller it is
     }
     
   }
